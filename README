@@ -1,0 +1,22 @@
+HitLogger module for Kohana 3.x
+Version 0.1
+===============================
+
+Requirements:
+
+- Kohana 3.0.3 and above
+- Module ORM enabled
+- Module Database enabled (for Kohana 3.0.3 there is a bug that prevents HitLogger from creating the needed tables, sp please download latest /modules/database/classes/kohana/database/mysql.php or at least the version that fixed the bug @ http://github.com/kohana/database/blob/ff956f39d9067fddf65b133dde95b8d276843420/classes/kohana/database/mysql.php)
+- application/config/database.php correctly configured to point to an active database
+
+Installation:
+
+1. Move contents of modules folder and frontend folder into their respective folder on your file system.
+2. Enable the module in bootstrap.php
+3. Copy /modules/hitlogger/config/hitlogger.php into /application/config folder and customize to your liking.
+4. Start browsing.
+5. Open <your_base_url>/hitlogger to see the statistics.
+
+Disclaimer:
+
+As this module is still under development, please only use it on your development website. Use on production website at your own risk. Backup your database before installing!
