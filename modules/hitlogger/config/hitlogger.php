@@ -35,11 +35,16 @@ return array(
 	// * translate to NULL to skip the URI from logging (warning: skipped URI splits the trail logs)
 	'translate_uri' => array(
 		'hitlogger(.*)' => NULL,
+		'hitmeter(.*)' => NULL,
 		'captcha(.*)' => NULL,
 	),
 
 	// page title
 	'page_title' => 'HitLogger',
+
+	// number images that are used to generate hitmeter
+	'num_images_path' => MODPATH.'hitlogger/numbers/a/',
+	'num_images_ext' => 'png',
 
 	// javascript/image file paths
 	'filepaths' => array(

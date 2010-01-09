@@ -11,13 +11,13 @@ class HitLogger_Core {
 
 	protected static $_instance = array();
 	protected static $_active_instance = 'default';
+	protected static $_configs;
 	protected $_year;
 	protected $_month;
 	protected $_date;
 	protected $_datestamp;
 	protected $_timestamp;
 	protected $_session_key;
-	protected $_configs;
 	protected $_request;
 	protected $_finalized = FALSE;
 	protected $_hitsession = NULL;
@@ -34,8 +34,6 @@ class HitLogger_Core {
 	 * @return  void
 	 */
 	protected function __construct() {
-		// read configs
-		$this->_configs = Kohana::config('hitlogger')->as_array();
 		// initialize variables
 		$date = getdate();
 		$this->_timestamp = $date[0];
@@ -52,8 +50,12 @@ class HitLogger_Core {
 	 * @param   string  configuration key
 	 * @return  mixed  the config value or the config array
 	 */
-	public function config($key = '') {
-		return (!empty($key)? Arr::get($this->_configs, $key) : $this->_configs);
+	public static function config($key = '') {
+		if (!self::$_configs) {
+			// read configs
+			self::$_configs = Kohana::config('hitlogger')->as_array();
+		}
+		return (!empty($key)? Arr::get(self::$_configs, $key) : self::$_configs);
 	}
 
 	/**
@@ -106,14 +108,14 @@ class HitLogger_Core {
 		}
 
 		// translate uri
-		$this->_translated_uri = $this->translate_uri($this->_request->uri);
+		$this->_translated_uri = self::translate_uri($this->_request->uri);
 		if (is_null($this->_translated_uri)) {
 			return $this;
 		}
 
 		// create db tables if not exist
-		$prefix = $this->config('tbl_prefix');
-		$dbprof = $this->config('db_profile');
+		$prefix = self::config('tbl_prefix');
+		$dbprof = self::config('db_profile');
 		$db = (empty($dbprof)? Database::instance() : Database::instance($dbprof));
 		if (count($db->list_tables($prefix . 'hit_%')) == 0) {
 			$schemas = array(
@@ -148,9 +150,10 @@ class HitLogger_Core {
 			))->save();
 
 			// new day so clean up trails if necessary
-			$trails_cleanup_age = $this->config('trails_cleanup_age');
+			$trails_cleanup_age = self::config('trails_cleanup_age');
 			if ($trails_cleanup_age > 0) {
-				$old_trails = ORM::factory('hit_trail')->with('stat:date')->where('stat:date.datestamp', '<=', $this->_datestamp - $trails_cleanup_age)->find_all();
+				$expired = date('Ymd', mktime(0,0,0, $this->_month, $this->_date, $this->_year) - ($trails_cleanup_age * 86400));
+				$old_trails = ORM::factory('hit_trail')->with('stat:date')->where('stat:date.datestamp', '<=', $expired)->find_all();
 				foreach ($old_trails as $trail) {
 					$trail->delete();
 				}
@@ -165,7 +168,7 @@ class HitLogger_Core {
 		$hitvisitor = ORM::factory('hit_visitor', $visitorinfo);
 		if (!$hitvisitor->loaded()) {
 			// ip you don't want logged
-			foreach ($this->config('incognito_ip') as $nolog) {
+			foreach (self::config('incognito_ip') as $nolog) {
 				$nolog = str_replace('.', '\.', $nolog);
 				$nolog = str_replace('*', '(.*)', $nolog);
 				$nolog = str_replace('?', '(.)', $nolog);
@@ -179,7 +182,7 @@ class HitLogger_Core {
 			try {
 				$host = @gethostbyaddr($ip);
 				$visitorinfo['hostname'] = $host;
-				foreach ($this->config('incognito_host') as $nolog) {
+				foreach (self::config('incognito_host') as $nolog) {
 					$nolog = str_replace('.', '\.', $nolog);
 					$nolog = str_replace('*', '(.*)', $nolog);
 					$nolog = str_replace('?', '(.)', $nolog);
@@ -210,7 +213,7 @@ class HitLogger_Core {
 		$urlbase = url::base(FALSE, TRUE);
 		if (strpos($referer_url, $urlbase) !== FALSE) {
 			$referer_uri = substr($referer_url, strlen($urlbase));
-			$referer_uri = $this->translate_uri($referer_uri);
+			$referer_uri = self::translate_uri($referer_uri);
 			$this->_hitrefuri = ORM::factory('hit_uri', array( 'uri' => $referer_uri ));
 		}
 
@@ -250,7 +253,7 @@ class HitLogger_Core {
 			$sessioninfo['timestamp'] = $this->_timestamp;
 			$this->_hitsession->values($sessioninfo)->save();
 		}
-		elseif ($this->config('enable_trails')) {
+		elseif (self::config('enable_trails')) {
 			// since we are using the trail logging, let's use this instead to get visited_uri
 			$vis = ORM::factory('hit_trail')
 				->with('uri')
@@ -264,7 +267,7 @@ class HitLogger_Core {
 			}
 		}
 		else {
-			$visited_uri = Kohana::cache('hitlogger_' . $this->_session_key, NULL, $this->config('cache_timeout'));
+			$visited_uri = Kohana::cache('hitlogger_' . $this->_session_key, NULL, self::config('cache_timeout'));
 			if (!$visited_uri) {
 				$visited_uri = array();
 			}
@@ -273,7 +276,6 @@ class HitLogger_Core {
 		/* hit_uri */
 		$uriinfo = array('uri' => $this->_translated_uri);
 		$this->_hituri = ORM::factory('hit_uri', $uriinfo);
-		$uriinfo['hits'] = ($this->_hituri->loaded()? $this->_hituri->hits+1:1);
 		$this->_hituri->values($uriinfo)->save();
 
 		/* hit_stats */
@@ -285,6 +287,10 @@ class HitLogger_Core {
 		);
 		$hitstat = ORM::factory('hit_stat', $statinfo);
 		if (!$visited) {
+			// increase hit count
+			$this->_hituri->hits++;
+			$this->_hituri->save();
+			// modify hit stat
 			$statinfo['accesses'] = ($hitstat->loaded()? $hitstat->accesses + 1:1);
 			$hitstat->values($statinfo)->save();
 			$this->_hitstat = $hitstat;
@@ -306,7 +312,7 @@ class HitLogger_Core {
 		}
 
 		/* hit_trail */
-		if ($this->config('enable_trails')) {
+		if (self::config('enable_trails')) {
 			// check if this is a page refresh
 			$lasthit = ORM::factory('hit_trail')
 				->with('stat')
@@ -323,28 +329,28 @@ class HitLogger_Core {
 					)
 					OR $lasthit->stat->status != $this->_request->status
 			) {
-					// yup, we are fine!
-					$this->_hittrail = ORM::factory('hit_trail');
-					$this->_hittrail->uri_id = $this->_hituri->id;
-					$this->_hittrail->session_id = $this->_hitsession->id;
-					$this->_hittrail->referer_id = $this_referer_id;
-					$this->_hittrail->referer_uri_id = $this_referer_uri_id;
-					$this->_hittrail->timestamp = $this->_timestamp;
-					if ($hitstat->loaded()) {
-						$this->_hittrail->stat_id = $hitstat->id;
-					}
-					// figure out previous hit
-					if ($this_referer_uri_id != NULL) {
-						$prevhit = ORM::factory('hit_trail')
-							->where('uri_id', '=', $this_referer_uri_id)
-							->where('session_id', '=', $this->_hittrail->session_id)
-							->order_by('id', 'DESC')->find();
-						if ($prevhit->loaded()) {
-							$this->_hittrail->previous = $prevhit->id;
-						}
-					}
-					$this->_hittrail->save();
+				// yup, we are fine!
+				$this->_hittrail = ORM::factory('hit_trail');
+				$this->_hittrail->uri_id = $this->_hituri->id;
+				$this->_hittrail->session_id = $this->_hitsession->id;
+				$this->_hittrail->referer_id = $this_referer_id;
+				$this->_hittrail->referer_uri_id = $this_referer_uri_id;
+				$this->_hittrail->timestamp = $this->_timestamp;
+				if ($hitstat->loaded()) {
+					$this->_hittrail->stat_id = $hitstat->id;
 				}
+				// figure out previous hit
+				if ($this_referer_uri_id != NULL) {
+					$prevhit = ORM::factory('hit_trail')
+						->where('uri_id', '=', $this_referer_uri_id)
+						->where('session_id', '=', $this->_hittrail->session_id)
+						->order_by('id', 'DESC')->find();
+					if ($prevhit->loaded()) {
+						$this->_hittrail->previous = $prevhit->id;
+					}
+				}
+				$this->_hittrail->save();
+			}
 		}
 
 		return $this;
@@ -362,7 +368,7 @@ class HitLogger_Core {
 				return;
 			}
 
-			if ($this->config('enable_trails')) {
+			if (self::config('enable_trails')) {
 				$visited_obj = ORM::factory('hit_trail')
 					->where('stat_id', '=', $this->_hitstat->id)
 					->where('session_id', '=', $this->_hitsession->id);
@@ -377,14 +383,14 @@ class HitLogger_Core {
 				$cache_keys = Kohana::cache('hitlogger_session_caches', NULL, 86400);
 				if (!empty($cache_keys)) {
 					foreach ($cache_keys as $key) {
-						if (Kohana::cache($key, NULL, $this->config('cache_timeout')) == NULL) {
+						if (Kohana::cache($key, NULL, self::config('cache_timeout')) == NULL) {
 							unset ($cache_keys[$key]);
 						}
 					}
 				}
 				$cache_key = 'hitlogger_' . $this->_session_key;
 				$visited_key = $this->_request->status . $this->_translated_uri;
-				$visited_uri = Kohana::cache($cache_key, NULL, $this->config('cache_timeout'));
+				$visited_uri = Kohana::cache($cache_key, NULL, self::config('cache_timeout'));
 				$visited = isset($visited_uri[$visited_key]);
 				$visited_uri[$visited_key] = $visited_key;
 				Kohana::cache($cache_key, $visited_uri);
@@ -454,10 +460,12 @@ class HitLogger_Core {
 	/**
 	 * Get the number of hits for a specific uri and the year, month and date the counting started.
 	 *
+	 * @param   string  the uri
 	 * @return  array  array( number of hits, since year, since month, since date )
 	 */
-	public function get_hit($uri) {
-		$f = ORM::factory('hit_uri')->with('since')->where('uri', '=', $uri)->find();
+	public static function get_hits($uri) {
+		$ruri = self::translate_uri($uri);
+		$f = ORM::factory('hit_uri')->with('since')->where('uri', '=', $ruri)->find();
 		if ($f->loaded()) {
 			return array($f->hits, $f->since->year, $f->since->month, $f->since->date);
 		}
@@ -466,9 +474,15 @@ class HitLogger_Core {
 		}
 	}
 
-	public function translate_uri($uri) {
+	/**
+	 * Translate uri based on the translation rules defined in config/hitlogger.php
+	 *
+	 * @param   string  input uri
+	 * @return  string  translated uri
+	 */
+	public static function translate_uri($uri) {
 		$translated_uri = $uri;
-		foreach ($this->config('translate_uri') as $src => $value) {
+		foreach (self::config('translate_uri') as $src => $value) {
 			$matches = array();
 			if (preg_match('/^'. str_replace('/', '\/', $src) .'$/i', $translated_uri, $matches) > 0) {
 				if (is_string($value)) {
@@ -480,6 +494,16 @@ class HitLogger_Core {
 			}
 		}
 		return $translated_uri;
+	}
+
+	/**
+	 * Generate <img> tag for displaying hitmeter for a particular uri
+	 *
+	 * @param   string  the uri
+	 * @return  string  <img> tag
+	 */
+	public static function get_hitmeter($uri) {
+		return HTML::image(URL::base(TRUE, TRUE) .'hitmeter?u='.$uri);
 	}
 	
 }
