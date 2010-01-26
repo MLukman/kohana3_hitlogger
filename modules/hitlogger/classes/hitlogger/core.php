@@ -150,14 +150,7 @@ class HitLogger_Core {
 			))->save();
 
 			// new day so clean up trails if necessary
-			$trails_cleanup_age = self::config('trails_cleanup_age');
-			if ($trails_cleanup_age > 0) {
-				$expired = date('Ymd', mktime(0,0,0, $this->_month, $this->_date, $this->_year) - ($trails_cleanup_age * 86400));
-				$old_trails = ORM::factory('hit_trail')->with('stat:date')->where('stat:date.datestamp', '<=', $expired)->find_all();
-				foreach ($old_trails as $trail) {
-					$trail->delete();
-				}
-			}
+			$this->truncate_trails(self::config('trails_cleanup_age'));
 		}
 
 		/* hit_visitor */
@@ -454,6 +447,22 @@ class HitLogger_Core {
 		}
 		catch (Exception $e) {
 			Kohana::exception_handler($e);
+		}
+	}
+
+	/**
+	 * Truncate old trails
+	 *
+	 * @param   integer  the age of trails threshold (in days)
+	 * @return  void
+	 */
+	public function truncate_trails($trail_age_cutoff) {
+		if ($trail_age_cutoff > 0) {
+			$expired = date('Ymd', mktime(0,0,0, $this->_month, $this->_date, $this->_year) - ($trail_age_cutoff * 86400));
+			$old_trails = ORM::factory('hit_trail')->with('stat:date')->where('stat:date.datestamp', '<=', $expired)->find_all();
+			foreach ($old_trails as $trail) {
+				$trail->delete();
+			}
 		}
 	}
 

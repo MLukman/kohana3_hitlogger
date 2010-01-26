@@ -298,19 +298,18 @@ class HitLogger_Controller extends Controller_Template {
 			if (count($trunc_date) == 3) {
 				$datestamp = intval(implode('', $trunc_date));
 				$dt = getdate();
-				$today = intval($dt['year'] . $dt['mon'] . $dt['mday']);
+				$today = intval(sprintf('%d%02d%02d', $dt['year'], $dt['mon'], $dt['mday']));
 				if ($today - $datestamp > 0) {
 					$trunc_trails = ORM::factory('hit_trail')
 						->with('stat:date')
 						->where('stat:date.datestamp', '<=', $datestamp)
-						->find_all();
+						->find();
 					foreach ($trunc_trails as $trail) {
 						$trail->delete();
 					}
 					$this->request->redirect($this->request->uri);
 				}
 			}
-
 		}
 
 		$sessions_obj = ORM::factory('hit_trail')->with('session')->group_by('session_id')->order_by('session.timestamp', 'DESC')->find_all();

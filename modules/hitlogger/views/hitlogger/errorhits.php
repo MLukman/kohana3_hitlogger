@@ -10,7 +10,7 @@ $(function() {
 });
 </script>
 <h2>Error Hits</h2>
-<form action="" method="POST" name="plot">
+<form action="" method="post" name="plot">
 <h3><a name="daily">Daily error hits</a></h3>
 <input type="submit" value="Select month:" onclick="return (document.forms.plot.action='#daily');" /> <select name="month">
 <?php 

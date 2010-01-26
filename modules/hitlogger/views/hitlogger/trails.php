@@ -55,11 +55,14 @@ foreach ($items as $item) {
 <ul id="sessions" class="treeview-black">
 <?php $first = TRUE;
 foreach ($sessions as $date => $datesessions): ?>
-	<li><?php if (!$first): ?><form action="" method="POST"><span><?php echo $date; ?></span> 
+	<li>
+		<span><?php echo $date; ?></span>
+		<?php if (!$first): ?><form action="" method="post" style="display:inline">
+			<p style="display:inline">
 			<input type="hidden" name="op" value="truncate" />
 			<input type="hidden" name="date" value="<?php echo $date; ?>" />
-			<input type="submit" value="Truncate" /></form>
-		<?php else: $first = FALSE; ?><span><?php echo $date; ?></span><?php endif; ?>
+			<input type="submit" value="Truncate" /></p></form>
+		<?php else: $first = FALSE; ?><?php endif; ?>
 		<ul>
 		<?php foreach ($datesessions as $session): ?>
 			<li><span>[<?php echo date('h:i:sa', $session['timestamp']); ?>]
@@ -73,4 +76,3 @@ foreach ($sessions as $date => $datesessions): ?>
 <?php endforeach; ?>
 </ul>
 <?php endif; ?>
-</form>

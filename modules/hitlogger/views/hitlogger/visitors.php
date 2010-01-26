@@ -1,4 +1,5 @@
 <script type="text/javascript">
+//<!--
 $(function() {
 <?php if (!empty($daily['values'])):
 		$values = array();
@@ -71,9 +72,10 @@ $(function() {
     $("#monthlyplot").bind("plothover", hoverHandler);
 
 });
+// -->
 </script>
 <h2>Unique visitors</h2>
-<form action="" method="POST" name="plot">
+<form action="" method="post" name="plot">
 <h3><a name="daily">Daily unique visitors</a></h3>
 <input type="submit" value="Select month:" onclick="return (document.forms.plot.action='#daily');" /> <select name="month">
 <?php 
