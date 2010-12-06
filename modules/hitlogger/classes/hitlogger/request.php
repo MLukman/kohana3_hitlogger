@@ -8,7 +8,9 @@ class HitLogger_Request extends Kohana_Request {
 	{
 		try {
 			$req = parent::instance($uri);
-			$req->_loghit = TRUE;
+			if (!Kohana::$is_cli) {
+				$req->_loghit = TRUE;
+			}
 			return $req;
 		}
 		catch (Exception $e) {

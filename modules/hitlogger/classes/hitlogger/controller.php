@@ -303,7 +303,7 @@ class HitLogger_Controller extends Controller_Template {
 					$trunc_trails = ORM::factory('hit_trail')
 						->with('stat:date')
 						->where('stat:date.datestamp', '<=', $datestamp)
-						->find();
+						->find_all();
 					foreach ($trunc_trails as $trail) {
 						$trail->delete();
 					}
@@ -347,7 +347,7 @@ class HitLogger_Controller extends Controller_Template {
 		if (!empty($with)) {
 			$m1->with($with);
 		}
-		$objs = $m1->order_by('datestamp', 'ASC')->find_all()->as_array();
+		$objs = $m1->order_by('datestamp', 'ASC')->find_all();
 		if (empty($objs)) {
 			$cur = getdate();
 			$month = sprintf('%d%02d', $cur['year'], $cur['mon']);
@@ -389,7 +389,7 @@ class HitLogger_Controller extends Controller_Template {
 		return array($months, $years, $first, $last);
 	}
 
-	protected function generate_data_series($model, $mode, $accessor = '') {
+	protected function generate_data_series($model, $mode, $accessor = '', $firstdate = NULL) {
 		switch ($mode) {
 
 		case 'DAILY':
@@ -485,9 +485,9 @@ class HitLogger_Controller extends Controller_Template {
 				$thisyear = intval(date('Y'));
 				$thismonth = intval(date('n'));
 				while ($month_b4 < 12 and !($year_b4 == $thisyear and $month_b4 == $thismonth)) {
-					$timestamp += 86400000;
-					$monthly['values']["$timestamp"] = array($timestamp, 0);
 					$month_b4++;
+					$timestamp = gmmktime(0, 0, 0, $month_b4, 1, $year_b4) * 1000 ;
+					$monthly['values']["$timestamp"] = array($timestamp, 0);
 				}
 			}
 			return $monthly;
